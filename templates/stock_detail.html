@@ -1,0 +1,402 @@
+{% extends "base.html" %}
+
+{% block title %}{{ stock_code }} - Stock Analysis{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2>
+                    <i class="fas fa-chart-line me-2"></i>
+                    {{ stock_code }} Stock Analysis
+                </h2>
+                <div>
+                    <div class="btn-group" role="group">
+                        <a href="{{ url_for('stock_detail', stock_code=stock_code, period='1y') }}" 
+                           class="btn {% if time_period == '1y' %}btn-success{% else %}btn-outline-success{% endif %} btn-sm">
+                            1 Year
+                        </a>
+                        <a href="{{ url_for('stock_detail', stock_code=stock_code, period='2y') }}" 
+                           class="btn {% if time_period == '2y' %}btn-success{% else %}btn-outline-success{% endif %} btn-sm">
+                            2 Years
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fundamental Data -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Fundamental Details
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="row">
+                                <div class="col-sm-6">
+                                    <div class="mb-3">
+                                        <label class="form-label text-muted">Company Name</label>
+                                        <div class="fw-bold">{{ fundamental_data.get('company_name', 'N/A') }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-sm-6">
+                                    <div class="mb-3">
+                                        <label class="form-label text-muted">Current Price</label>
+                                        <div class="fw-bold text-info">₹{{ "%.2f"|format(fundamental_data.get('current_price', 0)) }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-sm-6">
+                                    <div class="mb-3">
+                                        <label class="form-label text-muted">P/E Ratio</label>
+                                        <div class="fw-bold">{{ "%.2f"|format(fundamental_data.get('pe_ratio', 0)) if fundamental_data.get('pe_ratio') else 'N/A' }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-sm-6">
+                                    <div class="mb-3">
+                                        <label class="form-label text-muted">Debt-to-Equity</label>
+                                        <div class="fw-bold">{{ "%.2f"|format(fundamental_data.get('debt_to_equity', 0)) if fundamental_data.get('debt_to_equity') else 'N/A' }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-sm-6">
+                                    <div class="mb-3">
+                                        <label class="form-label text-muted">52-Week High</label>
+                                        <div class="fw-bold text-success">₹{{ "%.2f"|format(fundamental_data.get('week_52_high', 0)) }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-sm-6">
+                                    <div class="mb-3">
+                                        <label class="form-label text-muted">52-Week Low</label>
+                                        <div class="fw-bold text-danger">₹{{ "%.2f"|format(fundamental_data.get('week_52_low', 0)) }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="row">
+                                <div class="col-sm-6">
+                                    <div class="mb-3">
+                                        <label class="form-label text-muted">Lifetime High</label>
+                                        <div class="fw-bold text-warning">₹{{ "%.2f"|format(fundamental_data.get('lifetime_high', 0)) }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-sm-6">
+                                    <div class="mb-3">
+                                        <label class="form-label text-muted">Industry Sector</label>
+                                        <div class="fw-bold">{{ fundamental_data.get('industry_sector', 'N/A') }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-sm-6">
+                                    <div class="mb-3">
+                                        <label class="form-label text-muted">Market Cap</label>
+                                        <div class="fw-bold">
+                                            {% if fundamental_data.get('market_cap') %}
+                                                ₹{{ "{:,.0f}".format(fundamental_data.market_cap / 10000000) }} Cr
+                                            {% else %}
+                                                N/A
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-sm-6">
+                                    <div class="mb-3">
+                                        <label class="form-label text-muted">Beta</label>
+                                        <div class="fw-bold">{{ "%.2f"|format(fundamental_data.get('beta', 0)) if fundamental_data.get('beta') else 'N/A' }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-sm-6">
+                                    <div class="mb-3">
+                                        <label class="form-label text-muted">ROE</label>
+                                        <div class="fw-bold">{{ "%.2f"|format(fundamental_data.get('return_on_equity', 0) * 100) }}% {{ '' if not fundamental_data.get('return_on_equity') else '' }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-sm-6">
+                                    <div class="mb-3">
+                                        <label class="form-label text-muted">Profit Margin</label>
+                                        <div class="fw-bold">{{ "%.2f"|format(fundamental_data.get('profit_margins', 0) * 100) }}% {{ '' if not fundamental_data.get('profit_margins') else '' }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Business Summary -->
+                    {% if fundamental_data.get('business_summary') and fundamental_data.business_summary != 'N/A' %}
+                        <div class="mt-4">
+                            <label class="form-label text-muted">Business Summary</label>
+                            <div class="border rounded p-3 bg-dark">
+                                {{ fundamental_data.business_summary[:500] }}{% if fundamental_data.business_summary|length > 500 %}...{% endif %}
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overall Signal -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-signal me-2"></i>
+                        Overall Signal
+                    </h5>
+                </div>
+                <div class="card-body text-center">
+                    {% set overall_signals = [] %}
+                    {% for strategy_name, analysis in strategy_analysis.items() %}
+                        {% if analysis and analysis['signal_details'] %}
+                            {% set _ = overall_signals.append(analysis['signal_details']['signal']) %}
+                        {% endif %}
+
+                    {% endfor %}
+
+                    {% set buy_count = overall_signals | select('equalto', 'Buy') | list | length %}
+                    {% set sell_count = overall_signals | select('equalto', 'Sell') | list | length %}
+                    {% set watch_count = overall_signals | select('equalto', 'Watch') | list | length %}
+
+
+                    {% set total_signals = buy_count + sell_count + watch_count %}
+
+
+                    {% if total_signals > 0 %}
+                        {% if buy_count / total_signals >= 0.6 %}
+                            {% set final_signal = 'Buy' %}
+                        {% elif sell_count / total_signals >= 0.6 %}
+                            {% set final_signal = 'Sell' %}
+                        {% elif watch_count / total_signals >= 0.4 %}
+                            {% set final_signal = 'Watch' %}
+                        {% else %}
+                            {% set final_signal = 'Neutral' %}
+                        {% endif %}
+                    {% else %}
+                        {% set final_signal = 'Neutral' %}
+                    {% endif %}
+
+                    <div class="mb-3">
+                        <span class="badge {{ getSignalBadgeClass(final_signal) }} fs-4 p-3">
+                            {{ final_signal }}
+                        </span>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-3">
+                            <div class="text-success">
+                                <strong>{{ buy_count }}</strong><br>
+                                <small>Buy Signals</small>
+                            </div>
+                        </div>
+                        <div class="col-3">
+                            <div class="text-danger">
+                                <strong>{{ sell_count }}</strong><br>
+                                <small>Sell Signals</small>
+                            </div>
+                        </div>
+                        <div class="col-3">
+                            <div class="text-warning">
+                                <strong>{{ watch_count }}</strong><br>
+                                <small>Watch Signals</small>
+                            </div>
+                        </div>
+                        <div class="col-3">
+                            <div class="text-info">
+                                <strong>{{ overall_signals | length }}</strong><br>
+                                <small>Total Strategies</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Strategy Analysis Tabs -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-bar me-2"></i>
+                        Technical Analysis
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if strategy_analysis %}
+                        <!-- Strategy Tabs -->
+                        <ul class="nav nav-tabs" id="strategyTabs" role="tablist">
+                            {% for strategy_name, analysis in strategy_analysis.items() %}
+                                {% if analysis %}
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link {% if loop.first %}active{% endif %}"
+                                                id="{{ strategy_name }}-tab" data-bs-toggle="tab"
+                                                data-bs-target="#{{ strategy_name }}-pane" type="button"
+                                                role="tab" aria-controls="{{ strategy_name }}-pane"
+                                                aria-selected="{% if loop.first %}true{% else %}false{% endif %}">
+                                            {{ analysis.strategy_name }}
+                                        </button>
+                                    </li>
+                                {% endif %}
+                            {% endfor %}
+                        </ul>
+
+                        <!-- Tab Content -->
+                        <div class="tab-content strategy-tab-content mt-3" id="strategyTabContent">
+                            {% for strategy_name, analysis in strategy_analysis.items() %}
+                                {% if analysis %}
+                                    <div class="tab-pane fade {% if loop.first %}show active{% endif %}"
+                                         id="{{ strategy_name }}-pane" role="tabpanel"
+                                         aria-labelledby="{{ strategy_name }}-tab">
+
+                                        <!-- Chart Row -->
+                                        <div class="row mb-4">
+                                            <div class="col-12">
+                                                <div class="chart-container" id="chart-{{ strategy_name }}">
+                                                    <!-- Chart will be loaded here -->
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Details Row -->
+                                        <div class="row">
+                                            <!-- Strategy Steps -->
+                                            <div class="col-md-6">
+                                                <div class="card steps-card">
+                                                    <div class="card-header">
+                                                        <h6 class="card-title mb-0">
+                                                            <i class="fas fa-list-ol me-2"></i>
+                                                            Strategy Steps
+                                                        </h6>
+                                                    </div>
+                                                    <div class="card-body">
+                                                        {% if analysis.steps %}
+                                                            <ol class="list-unstyled">
+                                                                {% for step in analysis.steps %}
+                                                                    <li class="mb-2">
+                                                                        <i class="fas fa-check-circle text-success me-2"></i>
+                                                                        {{ step }}
+                                                                    </li>
+                                                                {% endfor %}
+                                                            </ol>
+                                                        {% else %}
+                                                            <p class="text-muted">No strategy steps available</p>
+                                                        {% endif %}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <!-- Signal Details -->
+                                            <div class="col-md-6">
+                                                <div class="card signal-card signal-{{ analysis.signal_details.signal.lower() }}">
+                                                    <div class="card-header">
+                                                        <h6 class="card-title mb-0">
+                                                            <i class="fas fa-signal me-2"></i>
+                                                            Signal Details
+                                                        </h6>
+                                                    </div>
+                                                    <div class="card-body">
+                                                        {% set signal_details = analysis.signal_details %}
+
+                                                        <div class="mb-3 text-center">
+                                                            <span class="badge {{ getSignalBadgeClass(signal_details.signal) }} fs-5 p-2">
+                                                                {{ signal_details.signal }}
+                                                            </span>
+                                                        </div>
+
+                                                        <div class="row text-center">
+                                                            <div class="col-6">
+                                                                <div class="mb-2">
+                                                                    <small class="text-muted">Entry Price</small><br>
+                                                                    <strong>₹{{ "%.2f"|format(signal_details.entry_price) }}</strong>
+                                                                </div>
+                                                            </div>
+                                                            <div class="col-6">
+                                                                <div class="mb-2">
+                                                                    <small class="text-muted">Target Price</small><br>
+                                                                    <strong>₹{{ "%.2f"|format(signal_details.target_price) if signal_details.target_price else 'N/A' }}</strong>
+                                                                </div>
+                                                            </div>
+                                                            <div class="col-6">
+                                                                <div class="mb-2">
+                                                                    <small class="text-muted">Potential Gain</small><br>
+                                                                    <strong class="text-success %}">
+                                                                        {{ signal_details.potential_gain }}%
+                                                                    </strong>
+                                                                </div>
+                                                            </div>
+                                                            <div class="col-6">
+                                                                <div class="mb-2">
+                                                                    <small class="text-muted">Confidence</small><br>
+                                                                    <strong>{{ "%.0f"|format(signal_details.confidence) }}</strong>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {% if signal_details.reason %}
+                                                            <div class="mt-3">
+                                                                <small class="text-muted">Reason:</small><br>
+                                                                <small>{{ signal_details.reason }}</small>
+                                                            </div>
+                                                        {% endif %}
+
+                                                        {% if signal_details.stop_loss %}
+                                                            <div class="mt-2">
+                                                                <small class="text-muted">Stop Loss:</small>
+                                                                <strong class="text-danger">₹{{ "%.2f"|format(signal_details.stop_loss) }}</strong>
+                                                            </div>
+                                                        {% endif %}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-chart-line fa-4x text-muted mb-4"></i>
+                            <h4 class="text-muted">No Strategy Analysis Available</h4>
+                            <p class="text-muted">Strategy analysis requires sufficient historical data. Please refresh data and try again.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Load charts for each strategy
+        {% for strategy_name, analysis in strategy_analysis.items() %}
+            {% if analysis %}
+                loadStrategyChart('{{ stock_code }}', '{{ strategy_name }}', '{{ time_period }}', 'chart-{{ strategy_name }}');
+            {% endif %}
+        {% endfor %}
+    });
+
+    // Override getSignalBadgeClass function
+    function getSignalBadgeClass(signal) {
+        switch(signal) {
+            case 'Buy': return 'bg-success';
+            case 'Sell': return 'bg-danger';
+            case 'Watch': return 'bg-warning text-dark';
+            case 'Neutral': return 'bg-secondary';
+            default: return 'bg-secondary';
+        }
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Panel - Stock Market Analysis{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-12">
+            <h2 class="mb-4">
+                <i class="fas fa-cog me-2"></i>
+                Admin Panel
+            </h2>
+        </div>
+    </div>
+
+    <!-- Add Stock Section -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-plus me-2"></i>
+                        Add Stock
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('add_stock') }}">
+                        <div class="mb-3">
+                            <label for="group" class="form-label">Group</label>
+                            <select class="form-select" id="group" name="group" required>
+                                {% for group in groups %}
+                                    <option value="{{ group }}">{{ group.replace('_', ' ') }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="stock_code" class="form-label">Stock Code (NSE)</label>
+                            <input type="text" class="form-control" id="stock_code" name="stock_code" 
+                                   placeholder="e.g., TCS, RELIANCE" required>
+                            <div class="form-text">Enter NSE stock code without .NS extension</div>
+                        </div>
+                        
+                        <!-- Personal Portfolio specific fields -->
+                        <div id="portfolio-fields" style="display: none;">
+                            <div class="mb-3">
+                                <label for="quantity" class="form-label">Quantity</label>
+                                <input type="number" class="form-control" id="quantity" name="quantity" 
+                                       step="1" min="1" placeholder="Number of shares">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="buy_price" class="form-label">Buy Price (₹)</label>
+                                <input type="number" class="form-control" id="buy_price" name="buy_price" 
+                                       step="0.01" min="0.01" placeholder="Price per share">
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-plus me-1"></i>
+                            Add Stock
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bulk Upload Section -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-upload me-2"></i>
+                        Bulk Upload
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('bulk_upload') }}" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <label for="bulk_group" class="form-label">Group</label>
+                            <select class="form-select" id="bulk_group" name="group" required>
+                                <option value="V40">V40</option>
+                                <option value="V40_Next">V40 Next</option>
+                                <option value="V200">V200</option>
+                            </select>
+                            <div class="form-text">Bulk upload not available for Personal Portfolio</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="file" class="form-label">Excel File</label>
+                            <input type="file" class="form-control" id="file" name="file" 
+                                   accept=".xlsx,.xls" required>
+                            <div class="form-text">Upload Excel file with stock codes in first column</div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-upload me-1"></i>
+                            Upload File
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stocks by Group -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-list me-2"></i>
+                        Manage Stocks
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- Group Tabs -->
+                    <ul class="nav nav-tabs" id="groupTabs" role="tablist">
+                        {% for group in groups %}
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link {% if loop.first %}active{% endif %}" 
+                                        id="{{ group }}-tab" data-bs-toggle="tab" 
+                                        data-bs-target="#{{ group }}-pane" type="button" 
+                                        role="tab" aria-controls="{{ group }}-pane" 
+                                        aria-selected="{% if loop.first %}true{% else %}false{% endif %}">
+                                    {{ group.replace('_', ' ') }}
+                                </button>
+                            </li>
+                        {% endfor %}
+                    </ul>
+
+                    <!-- Tab Content -->
+                    <div class="tab-content mt-3" id="groupTabContent">
+                        {% for group in groups %}
+                            <div class="tab-pane fade {% if loop.first %}show active{% endif %}" 
+                                 id="{{ group }}-pane" role="tabpanel" 
+                                 aria-labelledby="{{ group }}-tab">
+                                
+                                {% if stocks_data.get(group) %}
+                                    <div class="table-responsive">
+                                        <table class="table table-dark table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th>Stock Code</th>
+                                                    <th>Company Name</th>
+                                                    {% if group == 'Personal_Portfolio' %}
+                                                        <th>Quantity</th>
+                                                        <th>Buy Price</th>
+                                                    {% endif %}
+                                                    <th>Added Date</th>
+                                                    <th>Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for stock in stocks_data[group] %}
+                                                    <tr>
+                                                        <td>
+                                                            <strong>{{ stock.stock_code }}</strong>
+                                                        </td>
+                                                        <td>{{ stock.company_name or 'N/A' }}</td>
+                                                        {% if group == 'Personal_Portfolio' %}
+                                                            <td>{{ stock.get('quantity', 'N/A') }}</td>
+                                                            <td>
+                                                                {% if stock.get('buy_price') %}
+                                                                    ₹{{ "%.2f"|format(stock.buy_price) }}
+                                                                {% else %}
+                                                                    N/A
+                                                                {% endif %}
+                                                            </td>
+                                                        {% endif %}
+                                                        <td>{{ stock.added_date }}</td>
+                                                        <td>
+                                                            <form method="POST" action="{{ url_for('delete_stock') }}" 
+                                                                  class="d-inline" onsubmit="return confirm('Are you sure you want to delete {{ stock.stock_code }}?')">
+                                                                <input type="hidden" name="group" value="{{ group }}">
+                                                                <input type="hidden" name="stock_code" value="{{ stock.stock_code }}">
+                                                                <button type="submit" class="btn btn-danger btn-sm">
+                                                                    <i class="fas fa-trash"></i>
+                                                                </button>
+                                                            </form>
+                                                        </td>
+                                                    </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                {% else %}
+                                    <div class="text-center py-4">
+                                        <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                                        <p class="text-muted">No stocks in {{ group.replace('_', ' ') }} group</p>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+{% endblock %}

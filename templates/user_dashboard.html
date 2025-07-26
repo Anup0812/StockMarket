@@ -1,0 +1,407 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Stock Market Analysis{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-12">
+            <h2 class="mb-4">
+                <i class="fas fa-dashboard me-2"></i>
+                Stock Dashboard
+            </h2>
+        </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-title">Select Group</h6>
+                    <div class="btn-group w-100" role="group" aria-label="Stock Groups">
+                        {% for group in groups %}
+                            <a href="{{ url_for('user_dashboard', group=group, period=time_period) }}" 
+                               class="btn {% if group == selected_group %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                                {{ group.replace('_', ' ') }}
+                            </a>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-title">Time Period</h6>
+                    <div class="btn-group w-100" role="group" aria-label="Time Period">
+                        <a href="{{ url_for('user_dashboard', group=selected_group, period='1y') }}" 
+                           class="btn {% if time_period == '1y' %}btn-success{% else %}btn-outline-success{% endif %}">
+                            1 Year
+                        </a>
+                        <a href="{{ url_for('user_dashboard', group=selected_group, period='2y') }}" 
+                           class="btn {% if time_period == '2y' %}btn-success{% else %}btn-outline-success{% endif %}">
+                            2 Years
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stock Summary -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-line me-2"></i>
+                        {{ selected_group.replace('_', ' ') }} Stock Summary
+                    </h5>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-info">{{ stocks_data|length }} stocks</span>
+                        <form method="POST" action="{{ url_for('refresh_data') }}" class="d-inline">
+                            <button type="submit" class="btn btn-sm btn-outline-success" title="Refresh data from Yahoo Finance">
+                                <i class="fas fa-sync-alt me-1"></i>
+                                Refresh Data
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if stocks_data %}
+                        <div class="table-responsive">
+                            <table class="table table-dark table-striped table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Stock Code</th>
+                                        <th>Current Price</th>
+                                        <th>Daily Change (%)</th>
+                                        {% if selected_group == 'Personal_Portfolio' %}
+                                            <th>Quantity</th>
+                                            <th>Buy Price</th>
+                                            <th>Current Value</th>
+                                            <th>Gain/Loss (%)</th>
+                                        {% endif %}
+                                        <!-- Strategy columns -->
+                                        <th class="text-center">SMA</th>
+                                        <th class="text-center">V20</th>
+                                        <th class="text-center">Range</th>
+                                        <th class="text-center">Rev H&S</th>
+                                        <th class="text-center">Cup Handle</th>
+                                        <th class="text-center">V10</th>
+                                        <th class="text-center">Lifetime High</th>
+                                        <th class="text-center">Overall</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for stock in stocks_data %}
+                                        <tr>
+                                            <td>
+                                                <a href="{{ url_for('stock_detail', stock_code=stock.stock_code, period=time_period) }}" 
+                                                   class="stock-link" target="_blank" title="View detailed analysis">
+                                                    <strong>{{ stock.stock_code }}</strong>
+                                                    <i class="fas fa-external-link-alt ms-1 fa-sm"></i>
+                                                </a>
+                                            </td>
+                                            <td>
+                                                <strong>₹{{ "%.2f"|format(stock.get('current_price', 0)) }}</strong>
+                                            </td>
+                                            <td>
+                                                {% set daily_change = stock.get('daily_change', 0) %}
+                                                <span class="{% if daily_change > 0 %}text-success{% elif daily_change < 0 %}text-danger{% else %}text-muted{% endif %}">
+                                                    {% if daily_change > 0 %}+{% endif %}{{ "%.2f"|format(daily_change) }}%
+                                                    {% if daily_change > 0 %}
+                                                        <i class="fas fa-arrow-up fa-sm"></i>
+                                                    {% elif daily_change < 0 %}
+                                                        <i class="fas fa-arrow-down fa-sm"></i>
+                                                    {% endif %}
+                                                </span>
+                                            </td>
+                                            {% if selected_group == 'Personal_Portfolio' %}
+                                                <td>{{ stock.get('quantity', 'N/A') }}</td>
+                                                <td>
+                                                    {% if stock.get('buy_price') %}
+                                                        ₹{{ "%.2f"|format(stock.buy_price) }}
+                                                    {% else %}
+                                                        N/A
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    {% if stock.get('current_value') %}
+                                                        ₹{{ "%.2f"|format(stock.current_value) }}
+                                                    {% else %}
+                                                        N/A
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    {% if stock.get('gain_loss') is not none %}
+                                                        {% set gain_loss = stock.gain_loss %}
+                                                        <span class="{% if gain_loss > 0 %}text-success{% elif gain_loss < 0 %}text-danger{% else %}text-muted{% endif %}">
+                                                            {% if gain_loss > 0 %}+{% endif %}{{ "%.2f"|format(gain_loss) }}%
+                                                            {% if gain_loss > 0 %}
+                                                                <i class="fas fa-arrow-up fa-sm"></i>
+                                                            {% elif gain_loss < 0 %}
+                                                                <i class="fas fa-arrow-down fa-sm"></i>
+                                                            {% endif %}
+                                                        </span>
+                                                    {% else %}
+                                                        N/A
+                                                    {% endif %}
+                                                </td>
+                                            {% endif %}
+                                            <!-- Individual strategy signals -->
+                                            {% set strategy_signals = stock.get('strategy_signals', {}) %}
+                                            <td class="text-center">
+                                                <span class="badge {{ getSignalBadgeClass(strategy_signals.get('simple_moving_average', 'Neutral')) }}">
+                                                    {{ strategy_signals.get('simple_moving_average', 'Neutral') }}
+                                                </span>
+                                            </td>
+                                            <td class="text-center">
+                                                <span class="badge {{ getSignalBadgeClass(strategy_signals.get('v20', 'Neutral')) }}">
+                                                    {{ strategy_signals.get('v20', 'Neutral') }}
+                                                </span>
+                                            </td>
+                                            <td class="text-center">
+                                                <span class="badge {{ getSignalBadgeClass(strategy_signals.get('range_bound', 'Neutral')) }}">
+                                                    {{ strategy_signals.get('range_bound', 'Neutral') }}
+                                                </span>
+                                            </td>
+                                            <td class="text-center">
+                                                <span class="badge {{ getSignalBadgeClass(strategy_signals.get('reverse_head_shoulder', 'Neutral')) }}">
+                                                    {{ strategy_signals.get('reverse_head_shoulder', 'Neutral') }}
+                                                </span>
+                                            </td>
+                                            <td class="text-center">
+                                                <span class="badge {{ getSignalBadgeClass(strategy_signals.get('cup_with_handle', 'Neutral')) }}">
+                                                    {{ strategy_signals.get('cup_with_handle', 'Neutral') }}
+                                                </span>
+                                            </td>
+                                            <td class="text-center">
+                                                <span class="badge {{ getSignalBadgeClass(strategy_signals.get('v10', 'Neutral')) }}">
+                                                    {{ strategy_signals.get('v10', 'Neutral') }}
+                                                </span>
+                                            </td>
+                                            <td class="text-center">
+                                                <span class="badge {{ getSignalBadgeClass(strategy_signals.get('lifetime_high', 'Neutral')) }}">
+                                                    {{ strategy_signals.get('lifetime_high', 'Neutral') }}
+                                                </span>
+                                            </td>
+                                            <td class="text-center">
+                                                {% set overall_signal = stock.get('strategy_signal', 'Neutral') %}
+                                                <span class="badge {{ getSignalBadgeClass(overall_signal) }}">
+                                                    <strong>{{ overall_signal }}</strong>
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-inbox fa-4x text-muted mb-4"></i>
+                            <h4 class="text-muted">No stocks in {{ selected_group.replace('_', ' ') }}</h4>
+                            <p class="text-muted">Add stocks through the admin panel to see them here.</p>
+                            <a href="{{ url_for('admin') }}" class="btn btn-primary">
+                                <i class="fas fa-plus me-1"></i>
+                                Add Stocks
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+<!-- Trading Strategies Section -->
+    <br>
+<div class="row mb-5">
+    <div class="col-12">
+        <h2 class="mb-4">
+            <i class="fas fa-brain text-primary me-3"></i>
+            Trading Strategies Overview
+        </h2>
+    </div>
+</div>
+<div class="row">
+    <!-- Strategy 1: Simple Moving Average -->
+    <div class="col-lg-4 col-md-6 mb-4">
+        <div class="card h-100 strategy-card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-line me-2"></i>
+                    Simple Moving Average
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="card-text">Three SMA system (200, 50, 20 days) for V40 companies. Conservative approach for market leaders.</p>
+                <ul class="list-unstyled">
+                    <li><i class="fas fa-check text-success me-2"></i>V40 Companies Only</li>
+                    <li><i class="fas fa-check text-success me-2"></i>Max 9% of portfolio</li>
+                    <li><i class="fas fa-check text-success me-2"></i>No averaging allowed</li>
+                </ul>
+            </div>
+            <div class="card-footer bg-light">
+                <small class="text-success">Applicable to: V40</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Strategy 2: V20 -->
+    <div class="col-lg-4 col-md-6 mb-4">
+        <div class="card h-100 strategy-card">
+            <div class="card-header bg-info text-white">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-percentage me-2"></i>
+                    V20 Strategy
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="card-text">20% movement pattern analysis. Buy below range, sell at range top with averaging allowed.</p>
+                <ul class="list-unstyled">
+                    <li><i class="fas fa-check text-success me-2"></i>All groups applicable</li>
+                    <li><i class="fas fa-check text-success me-2"></i>Averaging permitted</li>
+                    <li><i class="fas fa-check text-success me-2"></i>No stop-loss</li>
+                </ul>
+            </div>
+            <div class="card-footer bg-light">
+                <small class="text-success">Applicable to: All Groups</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Strategy 3: Range-Bound -->
+    <div class="col-lg-4 col-md-6 mb-4">
+        <div class="card h-100 strategy-card">
+            <div class="card-header bg-warning text-white">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-arrows-alt-h me-2"></i>
+                    Range-Bound Trading
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="card-text">Support-resistance pattern with alternating touches. Minimum 14% range size required.</p>
+                <ul class="list-unstyled">
+                    <li><i class="fas fa-check text-success me-2"></i>≥2 touches per level</li>
+                    <li><i class="fas fa-check text-success me-2"></i>Minimum 14% range</li>
+                    <li><i class="fas fa-check text-success me-2"></i>1% entry tolerance</li>
+                </ul>
+            </div>
+            <div class="card-footer bg-light">
+                <small class="text-success">Applicable to: All Groups</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Strategy 4: Reverse Head & Shoulder -->
+    <div class="col-lg-4 col-md-6 mb-4">
+        <div class="card h-100 strategy-card">
+            <div class="card-header bg-success text-white">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-head-side-cough me-2"></i>
+                    Reverse Head & Shoulder
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="card-text">Classic reversal pattern for high-gain opportunities. Minimum 40% potential gain required.</p>
+                <ul class="list-unstyled">
+                    <li><i class="fas fa-check text-success me-2"></i>V40 & V40 Next only</li>
+                    <li><i class="fas fa-check text-success me-2"></i>Minimum 40% gain</li>
+                    <li><i class="fas fa-check text-success me-2"></i>No stop-loss</li>
+                </ul>
+            </div>
+            <div class="card-footer bg-light">
+                <small class="text-success">Applicable to: V40, V40 Next</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Strategy 5: Cup with Handle -->
+    <div class="col-lg-4 col-md-6 mb-4">
+        <div class="card h-100 strategy-card">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-coffee me-2"></i>
+                    Cup with Handle
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="card-text">RHS pattern without left shoulder. Various cup shapes supported with complex handles.</p>
+                <ul class="list-unstyled">
+                    <li><i class="fas fa-check text-success me-2"></i>V40 & V40 Next only</li>
+                    <li><i class="fas fa-check text-success me-2"></i>Multiple cup shapes</li>
+                    <li><i class="fas fa-check text-success me-2"></i>Complex handles allowed</li>
+                </ul>
+            </div>
+            <div class="card-footer bg-light">
+                <small class="text-success">Applicable to: V40, V40 Next</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Strategy 6: V10 -->
+    <div class="col-lg-4 col-md-6 mb-4">
+        <div class="card h-100 strategy-card">
+            <div class="card-header bg-danger text-white">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-plus me-2"></i>
+                    V10 Strategy
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="card-text">Add-on to RHS/CWH. Triggered by 10% fall after initial buy signal with reversal target.</p>
+                <ul class="list-unstyled">
+                    <li><i class="fas fa-check text-success me-2"></i>Add-on strategy</li>
+                    <li><i class="fas fa-check text-success me-2"></i>10% fall trigger</li>
+                    <li><i class="fas fa-check text-success me-2"></i>5% gap between trades</li>
+                </ul>
+            </div>
+            <div class="card-footer bg-light">
+                <small class="text-success">Applicable to: V40, V40 Next</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Strategy 7: Lifetime High -->
+    <div class="col-lg-4 col-md-6 mb-4">
+        <div class="card h-100 strategy-card">
+            <div class="card-header bg-dark text-white">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-crown me-2"></i>
+                    Lifetime High Strategy
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="card-text">"Best of the best" companies with lifetime high TTM numbers but discounted prices.</p>
+                <ul class="list-unstyled">
+                    <li><i class="fas fa-check text-success me-2"></i>Lifetime high TTM</li>
+                    <li><i class="fas fa-check text-success me-2"></i>Max 30% below high</li>
+                    <li><i class="fas fa-check text-success me-2"></i>30-40% target gain</li>
+                </ul>
+            </div>
+            <div class="card-footer bg-light">
+                <small class="text-success">Applicable to: V40, V40 Next</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Function to get signal badge class (override from base template)
+    function getSignalBadgeClass(signal) {
+        switch(signal) {
+            case 'Buy': return 'bg-success';
+            case 'Sell': return 'bg-danger';
+            case 'Watch': return 'bg-warning text-dark';
+            case 'Neutral': return 'bg-secondary';
+            default: return 'bg-secondary';
+        }
+    }
+</script>
+{% endblock %}
