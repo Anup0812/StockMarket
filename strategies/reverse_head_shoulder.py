@@ -4,14 +4,15 @@ from .base_strategy import BaseStrategy
 
 
 class ReverseHeadShoulderStrategy(BaseStrategy):
-    """Reverse Head and Shoulder Pattern Strategy - Enhanced with V10 detection logic"""
+    """Reverse Head and Shoulder Pattern Strategy - Enhanced with V10 detection logic and 15% gain requirement"""
 
     def __init__(self):
         super().__init__()
         self.applicable_groups = ['V40', 'V40_Next']
+        self.min_gain_threshold = 0.15  # 15% minimum gain requirement
 
     def get_signal(self, stock_data):
-        """Get trading signal based on RHS pattern"""
+        """Get trading signal based on RHS pattern with 15% gain requirement"""
         if len(stock_data) < 100:
             return 'Neutral'
 
@@ -23,6 +24,11 @@ class ReverseHeadShoulderStrategy(BaseStrategy):
         current_price = stock_data['Close'].iloc[-1]
 
         for pattern in patterns:
+            # Check potential gain first - must be at least 15%
+            potential_gain = (pattern['target_price'] - current_price) / current_price
+            if potential_gain < self.min_gain_threshold:
+                continue  # Skip patterns with less than 15% gain
+
             # Check if we're at the right shoulder breakout point
             if self._is_breakout_confirmed(stock_data, pattern):
                 return 'Buy'
@@ -38,20 +44,33 @@ class ReverseHeadShoulderStrategy(BaseStrategy):
         return 'Neutral'
 
     def analyze_stock(self, stock_data, fundamental_data):
-        """Perform detailed RHS analysis"""
+        """Perform detailed RHS analysis with 15% gain filtering"""
         if len(stock_data) < 100:
             return None
 
-        patterns = self._find_rhs_patterns(stock_data)
+        all_patterns = self._find_rhs_patterns(stock_data)
         current_price = stock_data['Close'].iloc[-1]
+
+        # Filter patterns by 15% gain requirement
+        patterns = []
+        for pattern in all_patterns:
+            potential_gain = (pattern['target_price'] - current_price) / current_price
+            if potential_gain >= self.min_gain_threshold:
+                patterns.append(pattern)
+
         signal = self.get_signal(stock_data)
 
         if not patterns:
+            # Check if there were any patterns before filtering
+            rejected_reason = "No patterns with 15%+ gain potential" if all_patterns else "No valid RHS pattern identified"
+
             return {
-                'strategy_name': 'Reverse Head and Shoulder',
+                'strategy_name': 'Reverse Head and Shoulder (15% Gain Required)',
                 'signal_details': self.format_signal_details('Neutral', current_price, None),
                 'steps': self._get_strategy_steps(),
-                'patterns': []
+                'patterns': [],
+                'rejected_patterns': len(all_patterns),
+                'rejection_reason': rejected_reason
             }
 
         active_pattern = patterns[0]
@@ -66,25 +85,30 @@ class ReverseHeadShoulderStrategy(BaseStrategy):
 
         # Add reason and additional details
         if signal == 'Buy':
-            signal_details['reason'] = "Green breakout candle confirmed above right shoulder base"
+            signal_details[
+                'reason'] = f"Green breakout candle confirmed above right shoulder base with {active_pattern['potential_gain']:.1f}% gain potential"
         elif signal == 'Sell':
             signal_details['reason'] = "Technical target price reached"
         elif signal == 'Watch':
-            signal_details['reason'] = "Right shoulder base forming - wait for breakout confirmation"
+            signal_details[
+                'reason'] = f"Right shoulder base forming with {active_pattern['potential_gain']:.1f}% gain potential - wait for breakout confirmation"
         else:
-            signal_details['reason'] = "No valid RHS pattern identified"
+            signal_details['reason'] = "No valid RHS pattern with 15%+ gain potential"
 
         signal_details['neckline'] = active_pattern['neckline']
         signal_details['pattern_depth'] = active_pattern['depth']
         signal_details['base_range'] = active_pattern.get('base_range', 'N/A')
         signal_details['neckline_horizontal_tolerance'] = active_pattern.get('neckline_tolerance', 'N/A')
+        signal_details['min_gain_required'] = f"{self.min_gain_threshold * 100:.0f}%"
+        signal_details['actual_gain_potential'] = f"{active_pattern['potential_gain']:.1f}%"
 
         return {
-            'strategy_name': 'Reverse Head and Shoulder',
+            'strategy_name': 'Reverse Head and Shoulder (15% Gain Required)',
             'signal_details': signal_details,
             'steps': self._get_strategy_steps(),
             'patterns': patterns,
-            'active_pattern': active_pattern
+            'active_pattern': active_pattern,
+            'rejected_patterns': len(all_patterns) - len(patterns)
         }
 
     def get_chart_config(self, stock_data):
@@ -92,7 +116,16 @@ class ReverseHeadShoulderStrategy(BaseStrategy):
         if len(stock_data) < 100:
             return {}
 
-        patterns = self._find_rhs_patterns(stock_data)
+        # Get all patterns first, then filter by gain requirement
+        all_patterns = self._find_rhs_patterns(stock_data)
+        current_price = stock_data['Close'].iloc[-1]
+
+        patterns = []
+        for pattern in all_patterns:
+            potential_gain = (pattern['target_price'] - current_price) / current_price
+            if potential_gain >= self.min_gain_threshold:
+                patterns.append(pattern)
+
         if not patterns:
             return {}
 
@@ -120,7 +153,7 @@ class ReverseHeadShoulderStrategy(BaseStrategy):
                     'mode': 'lines+markers',
                     'line': {'color': 'purple', 'width': 2},
                     'marker': {'color': 'purple', 'size': 8},
-                    'name': 'RHS Pattern'
+                    'name': f'RHS Pattern ({pattern["potential_gain"]:.1f}% gain)'
                 })
 
             # Draw HORIZONTAL neckline - FIXED to be truly horizontal
@@ -136,14 +169,14 @@ class ReverseHeadShoulderStrategy(BaseStrategy):
                 'name': 'Neckline'
             })
 
-            # Draw target line (technical target only)
+            # Draw target line (technical target only) - highlighted for 15%+ gain
             overlays.append({
                 'type': 'scatter',
                 'x': [neckline_start, neckline_end],
                 'y': [pattern['target_price'], pattern['target_price']],
                 'mode': 'lines',
-                'line': {'color': 'green', 'width': 2, 'dash': 'dot'},
-                'name': 'Target'
+                'line': {'color': 'green', 'width': 3, 'dash': 'dot'},  # Thicker line for qualified targets
+                'name': f'Target (15%+ gain)'
             })
 
             # Draw base range as a rectangle
@@ -160,7 +193,7 @@ class ReverseHeadShoulderStrategy(BaseStrategy):
                     'line': {'color': 'orange', 'width': 1}
                 })
 
-            # Mark key points
+            # Mark key points with gain percentage
             points = [
                 ('LS', pattern['left_shoulder']),
                 ('H', pattern['head']),
@@ -179,6 +212,17 @@ class ReverseHeadShoulderStrategy(BaseStrategy):
                     'ax': 0
                 })
 
+            # Add gain potential annotation
+            annotations.append({
+                'x': last_date_str,
+                'y': pattern['target_price'],
+                'text': f"+{pattern['potential_gain']:.1f}%",
+                'color': 'green',
+                'size': 14,
+                'ay': -25,
+                'ax': 0
+            })
+
         return {
             'overlays': overlays,
             'annotations': annotations
@@ -193,6 +237,8 @@ class ReverseHeadShoulderStrategy(BaseStrategy):
 
         if len(pivots) < 3:
             return patterns
+
+        current_price = stock_data['Close'].iloc[-1]
 
         for i in range(len(pivots) - 2):
             left_shoulder = pivots[i]
@@ -211,7 +257,6 @@ class ReverseHeadShoulderStrategy(BaseStrategy):
                 # Target is neckline + depth (technical target only)
                 target_price = neckline + depth
 
-                current_price = stock_data['Close'].iloc[-1]
                 potential_gain = (target_price - current_price) / current_price
                 base_info = self._detect_right_shoulder_base_enhanced(stock_data, right_shoulder)
 
@@ -234,13 +279,16 @@ class ReverseHeadShoulderStrategy(BaseStrategy):
                     'base_high': base_info['base_high'] if base_info else None,
                     'base_low': base_info['base_low'] if base_info else None,
                     'pattern_quality': pattern_quality,
-                    'volume_confirmation': self._check_volume_pattern(stock_data, left_shoulder, head, right_shoulder)
+                    'volume_confirmation': self._check_volume_pattern(stock_data, left_shoulder, head, right_shoulder),
+                    'meets_gain_requirement': potential_gain >= self.min_gain_threshold
                 }
                 patterns.append(pattern)
 
-        # Enhanced sorting considering quality and recency
-        patterns.sort(key=lambda x: (x['pattern_quality'], x['pattern_end'], x['potential_gain']), reverse=True)
-        return patterns[:2]
+        # Enhanced sorting considering quality, gain potential, and recency
+        patterns.sort(
+            key=lambda x: (x['meets_gain_requirement'], x['pattern_quality'], x['potential_gain'], x['pattern_end']),
+            reverse=True)
+        return patterns[:3]  # Return top 3 patterns
 
     def _find_enhanced_pivot_lows(self, stock_data, window=7):
         """Enhanced pivot low detection inspired by V10's significant high detection"""
@@ -529,7 +577,7 @@ class ReverseHeadShoulderStrategy(BaseStrategy):
                 base_info['base_high'] + tolerance)
 
     def _calculate_confidence(self, stock_data, pattern, fundamental_data):
-        """Enhanced confidence calculation with V10-inspired factors"""
+        """Enhanced confidence calculation with V10-inspired factors and gain bonus"""
         confidence = 50  # Reduced base confidence, will be built up
 
         # Pattern quality (max 25 points)
@@ -557,6 +605,17 @@ class ReverseHeadShoulderStrategy(BaseStrategy):
         if pattern.get('volume_confirmation', False):
             confidence += 15
 
+        # Gain potential bonus (max 15 points) - NEW
+        gain_pct = pattern['potential_gain'] / 100
+        if gain_pct >= 0.30:  # 30%+ gain
+            confidence += 15
+        elif gain_pct >= 0.25:  # 25%+ gain
+            confidence += 12
+        elif gain_pct >= 0.20:  # 20%+ gain
+            confidence += 9
+        elif gain_pct >= 0.15:  # 15%+ gain (minimum requirement)
+            confidence += 6
+
         # Pattern timing and recency (max 10 points)
         pattern_days = (pattern['pattern_end'] - pattern['pattern_start']).days
         if 45 <= pattern_days <= 120:  # Optimal duration
@@ -578,7 +637,7 @@ class ReverseHeadShoulderStrategy(BaseStrategy):
         return min(100, int(confidence))
 
     def _get_strategy_steps(self):
-        """Get enhanced strategy implementation steps"""
+        """Get enhanced strategy implementation steps with 15% gain requirement"""
         return [
             "1. Identify significant pivot lows using enhanced detection (2%+ significance)",
             "2. Find three pivots: Left Shoulder, Head (deepest), Right Shoulder",
@@ -586,10 +645,11 @@ class ReverseHeadShoulderStrategy(BaseStrategy):
             "4. Check proportional spacing and depth significance (3%+ from head)",
             "5. Find rebound peaks after left shoulder and after head formations",
             "6. Draw horizontal neckline with adaptive tolerance (1.5-3% based on volatility)",
-            "7. Assess overall pattern quality (symmetry, timing, depth)",
-            "8. Wait for right shoulder to form enhanced base (4-8% range based on volatility)",
-            "9. Look for confirmed breakout with volume support above base range",
-            "10. Buy on breakout confirmation with 0.5% margin above base",
-            "11. Target = Neckline + (Neckline - Head depth)",
-            "12. Monitor for technical target achievement"
+            "7. Calculate technical target: Neckline + (Neckline - Head depth)",
+            "8. FILTER: Only consider patterns with 15%+ gain potential from current price",
+            "9. Assess overall pattern quality (symmetry, timing, depth)",
+            "10. Wait for right shoulder to form enhanced base (4-8% range based on volatility)",
+            "11. Look for confirmed breakout with volume support above base range",
+            "12. Buy on breakout confirmation with 0.5% margin above base (15%+ gain assured)",
+            "13. Monitor for technical target achievement"
         ]
