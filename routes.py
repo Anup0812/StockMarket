@@ -12,6 +12,8 @@ from strategies.reverse_head_shoulder import ReverseHeadShoulderStrategy
 from strategies.cup_with_handle import CupWithHandleStrategy
 from strategies.v10_strategy import V10Strategy
 from strategies.lifetime_high_strategy import LifetimeHighStrategy
+from strategies.week_low_strategy import WeekLowStrategy
+
 
 # Initialize managers
 data_manager = DataManager()
@@ -25,7 +27,8 @@ strategies = {
     'reverse_head_shoulder': ReverseHeadShoulderStrategy(),
     'cup_with_handle': CupWithHandleStrategy(),
     'v10': V10Strategy(),
-    'lifetime_high': LifetimeHighStrategy()
+    'lifetime_high': LifetimeHighStrategy(),
+    'week_low': WeekLowStrategy()
 }
 
 
@@ -65,7 +68,9 @@ def determine_overall_signal(signals):
 @app.route('/')
 def index():
     """Main dashboard - redirect to user view"""
-    return redirect(url_for('user_dashboard'))
+    #return redirect(url_for('user_dashboard'))
+    return render_template('vivek_singhal_notes.html')
+
 
 
 @app.route('/admin/')
