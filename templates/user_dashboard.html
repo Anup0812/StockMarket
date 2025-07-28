@@ -4,30 +4,112 @@
 
 {% block content %}
 <style>
-/* Custom styling for the Overall column */
-.overall-column {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-    color: white !important;
-    font-weight: bold;
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+/* Enhanced professional styling for the Overall signal cells (data only, not header) */
+.overall-signal-cell {
+    background: linear-gradient(135deg, #1a1d29 0%, #2d3748 50%, #1a1d29 100%) !important;
+    border-left: 4px solid #4fd1c7 !important;
+    border-right: 4px solid #4fd1c7 !important;
+    padding: 16px 12px !important;
+    position: relative;
+    box-shadow: inset 0 0 20px rgba(79, 209, 199, 0.1) !important;
+    animation: subtle-glow 3s ease-in-out infinite alternate;
 }
 
-.overall-column th {
-    background: linear-gradient(135deg, #4a5dc2 0%, #5e3a82 100%) !important;
-    color: white !important;
-    border: 2px solid #3a4ba0 !important;
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+@keyframes subtle-glow {
+    0% { box-shadow: inset 0 0 20px rgba(79, 209, 199, 0.1), 0 0 10px rgba(79, 209, 199, 0.1); }
+    100% { box-shadow: inset 0 0 30px rgba(79, 209, 199, 0.2), 0 0 15px rgba(79, 209, 199, 0.2); }
 }
 
-.overall-column td {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-    border: 1px solid #5a6dd8 !important;
+.overall-signal-cell::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: linear-gradient(180deg, #4fd1c7 0%, #38b2ac 50%, #4fd1c7 100%);
+    animation: border-pulse 2s ease-in-out infinite alternate;
 }
 
-/* Enhance the badge visibility on colored background */
-.overall-column .badge {
+.overall-signal-cell::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: linear-gradient(180deg, #4fd1c7 0%, #38b2ac 50%, #4fd1c7 100%);
+    animation: border-pulse 2s ease-in-out infinite alternate;
+}
+
+@keyframes border-pulse {
+    0% { opacity: 0.7; }
+    100% { opacity: 1; }
+}
+
+/* Enhanced badge styling for overall signal */
+.overall-signal-cell .badge {
+    font-size: 0.9rem;
+    padding: 8px 16px;
     border: 2px solid rgba(255,255,255,0.3);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3), 0 0 20px rgba(79, 209, 199, 0.2);
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+}
+
+.overall-signal-cell .badge::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    transition: left 0.5s;
+}
+
+.overall-signal-cell:hover .badge::before {
+    left: 100%;
+}
+
+/* Enhanced signal-specific colors for overall column */
+.overall-signal-cell .bg-success {
+    background: linear-gradient(135deg, #22c55e, #16a34a) !important;
+    border-color: #dcfce7 !important;
+    color: #ffffff !important;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+
+.overall-signal-cell .bg-danger {
+    background: linear-gradient(135deg, #ef4444, #dc2626) !important;
+    border-color: #fecaca !important;
+    color: #ffffff !important;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+
+.overall-signal-cell .bg-warning {
+    background: linear-gradient(135deg, #f59e0b, #d97706) !important;
+    border-color: #fef3c7 !important;
+    color: #000000 !important;
+    text-shadow: 0 1px 2px rgba(255,255,255,0.3);
+}
+
+.overall-signal-cell .bg-secondary {
+    background: linear-gradient(135deg, #6b7280, #4b5563) !important;
+    border-color: #e5e7eb !important;
+    color: #ffffff !important;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+
+/* Subtle hover effect for overall cells */
+.overall-signal-cell:hover {
+    transform: scale(1.02);
+    transition: all 0.3s ease;
 }
 
 /* Strategy card hover effects */
@@ -38,6 +120,36 @@
 .strategy-card:hover {
     transform: translateY(-5px);
     box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+
+/* Professional table styling */
+.table-dark th {
+    border-top: 2px solid #495057;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 0.5px;
+}
+
+/* Enhanced overall column header styling */
+.overall-header {
+    background: linear-gradient(135deg, #495057 0%, #343a40 100%) !important;
+    color: #ffffff !important;
+    font-weight: 700 !important;
+    text-align: center !important;
+    border: 2px solid #6c757d !important;
+    position: relative;
+    overflow: hidden;
+}
+
+.overall-header::after {
+    content: '⭐';
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1.2em;
+    opacity: 0.7;
 }
 </style>
 
@@ -131,7 +243,7 @@
                                         <th class="text-center">V10</th>
                                         <th class="text-center">Lifetime High</th>
                                         <th class="text-center">52 Week Low</th>
-                                        <th class="text-center overall-column">Overall</th>
+                                        <th class="text-center overall-header">Overall</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -233,8 +345,8 @@
                                                     {{ strategy_signals.get('week_low', 'Neutral') }}
                                                 </span>
                                             </td>
-                                            <!-- Overall column with special styling -->
-                                            <td class="text-center overall-column">
+                                            <!-- Overall column with professional highlighting (data cells only) -->
+                                            <td class="text-center overall-signal-cell">
                                                 {% set overall_signal = stock.get('strategy_signal', 'Neutral') %}
                                                 <span class="badge {{ getSignalBadgeClass(overall_signal) }}">
                                                     <strong>{{ overall_signal }}</strong>
