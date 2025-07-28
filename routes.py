@@ -46,22 +46,38 @@ def getSignalBadgeClass(signal):
 
 
 def determine_overall_signal(signals):
-    """Determine overall signal from a list of strategy signals"""
+    """Determine overall signal from a list of strategy signals.
+    Priority: Buy/Sell/Watch signals take precedence over Neutral,
+    then highest count, with Buy > Sell > Watch as tie-breakers."""
+
     if not signals:
         return 'Neutral'
 
-    buy_count = signals.count('Buy')
-    sell_count = signals.count('Sell')
-    watch_count = signals.count('Watch')
+    # Count each signal type
+    counts = {
+        'Buy': signals.count('Buy'),
+        'Sell': signals.count('Sell'),
+        'Watch': signals.count('Watch'),
+        'Neutral': signals.count('Neutral')
+    }
 
-    # Priority: Sell > Buy > Watch > Neutral
-    if sell_count > 0:
-        return 'Sell'
-    elif buy_count > 0:
-        return 'Buy'
-    elif watch_count > 0:
-        return 'Watch'
+    # First, eliminate Neutral if there are any non-Neutral signals
+    non_neutral_counts = {k: v for k, v in counts.items() if k != 'Neutral'}
+    if sum(non_neutral_counts.values()) > 0:
+        # We have at least one Buy/Sell/Watch signal - ignore Neutral counts
+        max_count = max(non_neutral_counts.values())
+        candidates = [signal for signal, count in non_neutral_counts.items()
+                      if count == max_count]
+
+        # Resolve ties with priority: Buy > Sell > Watch
+        if 'Buy' in candidates:
+            return 'Buy'
+        elif 'Sell' in candidates:
+            return 'Sell'
+        else:
+            return 'Watch'
     else:
+        # Only Neutral signals were found
         return 'Neutral'
 
 
