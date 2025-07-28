@@ -91,6 +91,74 @@
             color: var(--bs-info);
             text-decoration: underline;
         }
+
+        /* Progress notification styles */
+        .refresh-progress {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1060;
+            background: rgba(0, 0, 0, 0.9);
+            border-radius: 10px;
+            padding: 30px;
+            text-align: center;
+            min-width: 300px;
+            display: none;
+        }
+
+        .refresh-progress .spinner-border {
+            width: 3rem;
+            height: 3rem;
+            color: var(--bs-success);
+        }
+
+        .refresh-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1055;
+            display: none;
+        }
+
+        .progress-text {
+            margin-top: 15px;
+            font-size: 1.1rem;
+            color: var(--bs-light);
+        }
+
+        .progress-subtext {
+            margin-top: 10px;
+            font-size: 0.9rem;
+            color: var(--bs-secondary);
+        }
+
+        /* Toast notification styles */
+        .toast-container {
+            position: fixed;
+            top: 90px;
+            right: 20px;
+            z-index: 1055;
+        }
+
+        .refresh-toast {
+            background-color: var(--bs-info);
+            color: white;
+            border: none;
+        }
+
+        .refresh-toast .toast-header {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: white;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .refresh-toast .btn-close {
+            filter: invert(1);
+        }
     </style>
 </head>
 <body>
@@ -101,11 +169,11 @@
                 <i class="fas fa-chart-line me-2"></i>
                 Stock Market Analysis
             </a>
-            
+
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
-            
+
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
@@ -121,10 +189,10 @@
                         </a>
                     </li>
                 </ul>
-                
+
                 <div class="d-flex">
-                    <form method="POST" action="{{ url_for('refresh_data') }}" class="d-inline">
-                        <button type="submit" class="btn btn-outline-success btn-sm">
+                    <form method="POST" action="{{ url_for('refresh_data') }}" class="d-inline" id="refresh-form">
+                        <button type="submit" class="btn btn-outline-success btn-sm" id="refresh-btn">
                             <i class="fas fa-sync-alt me-1"></i>
                             Refresh Data
                         </button>
@@ -133,6 +201,35 @@
             </div>
         </div>
     </nav>
+
+    <!-- Progress Overlay -->
+    <div class="refresh-overlay" id="refresh-overlay"></div>
+
+    <!-- Progress Modal -->
+    <div class="refresh-progress" id="refresh-progress">
+        <div class="spinner-border" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <div class="progress-text">Refreshing Stock Data</div>
+        <div class="progress-subtext">Please wait while we fetch the latest data from Yahoo Finance...</div>
+        <div class="mt-3 text-warning">
+            <small><i class="fas fa-exclamation-triangle me-1"></i>Do not close or refresh the page</small>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container">
+        <div class="toast refresh-toast" id="refresh-toast" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header">
+                <i class="fas fa-sync-alt me-2"></i>
+                <strong class="me-auto">Data Refresh</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body">
+                Starting data refresh process...
+            </div>
+        </div>
+    </div>
 
     <!-- Flash Messages -->
     <div class="flash-messages">
@@ -155,22 +252,89 @@
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    
+
     <!-- Custom JavaScript -->
     {% block scripts %}{% endblock %}
-    
+
     <script>
+        // Refresh notification system
+        document.addEventListener('DOMContentLoaded', function() {
+            const refreshForm = document.getElementById('refresh-form');
+            const refreshBtn = document.getElementById('refresh-btn');
+            const refreshOverlay = document.getElementById('refresh-overlay');
+            const refreshProgress = document.getElementById('refresh-progress');
+            const refreshToast = document.getElementById('refresh-toast');
+
+            if (refreshForm && refreshBtn) {
+                refreshForm.addEventListener('submit', function(e) {
+                    // Show initial toast notification
+                    const toast = new bootstrap.Toast(refreshToast);
+                    toast.show();
+
+                    // Update button state
+                    const originalHtml = refreshBtn.innerHTML;
+                    refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Starting...';
+                    refreshBtn.disabled = true;
+
+                    // Show progress modal after 1 second
+                    setTimeout(function() {
+                        refreshOverlay.style.display = 'block';
+                        refreshProgress.style.display = 'block';
+
+                        // Update toast message
+                        const toastBody = refreshToast.querySelector('.toast-body');
+                        toastBody.textContent = 'Fetching data from Yahoo Finance...';
+                    }, 1000);
+
+                    // Set a maximum timeout to prevent infinite loading
+                    setTimeout(function() {
+                        if (refreshProgress.style.display === 'block') {
+                            hideRefreshProgress();
+                            showAlert('Refresh is taking longer than expected. Please check the results.', 'warning');
+                        }
+                    }, 300000); // 5 minutes timeout
+                });
+            }
+
+            // Function to hide progress indicators
+            function hideRefreshProgress() {
+                if (refreshOverlay) refreshOverlay.style.display = 'none';
+                if (refreshProgress) refreshProgress.style.display = 'none';
+                if (refreshBtn) {
+                    refreshBtn.innerHTML = '<i class="fas fa-sync-alt me-1"></i>Refresh Data';
+                    refreshBtn.disabled = false;
+                }
+            }
+
+            // Hide progress when page loads (in case of redirect after refresh)
+            window.addEventListener('load', function() {
+                hideRefreshProgress();
+            });
+
+            // Handle page visibility change (when user switches tabs)
+            document.addEventListener('visibilitychange', function() {
+                if (document.visibilityState === 'visible') {
+                    // Check if we're returning from a refresh operation
+                    const urlParams = new URLSearchParams(window.location.search);
+                    if (document.referrer.includes('refresh_data') ||
+                        performance.navigation.type === performance.navigation.TYPE_BACK_FORWARD) {
+                        hideRefreshProgress();
+                    }
+                }
+            });
+        });
+
         // Auto-dismiss flash messages after 5 seconds
         setTimeout(function() {
             $('.alert').alert('close');
         }, 5000);
-        
+
         // Utility function to format numbers
         function formatNumber(num, decimals = 2) {
             if (num === null || num === undefined) return 'N/A';
             return parseFloat(num).toFixed(decimals);
         }
-        
+
         // Utility function to format currency
         function formatCurrency(num, decimals = 2) {
             if (num === null || num === undefined) return '₹0.00';
@@ -179,7 +343,7 @@
                 maximumFractionDigits: decimals
             });
         }
-        
+
         // Utility function to get signal badge class
         function getSignalBadgeClass(signal) {
             switch(signal) {
@@ -190,6 +354,42 @@
                 default: return 'bg-secondary';
             }
         }
+
+        // Utility function to show custom alerts
+        function showAlert(message, type = 'info') {
+            const flashContainer = document.querySelector('.flash-messages');
+            if (!flashContainer) return;
+
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type} alert-dismissible fade show`;
+            alert.role = 'alert';
+            alert.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            `;
+
+            flashContainer.appendChild(alert);
+
+            // Auto-dismiss after 5 seconds
+            setTimeout(() => {
+                if (alert.parentNode) {
+                    alert.remove();
+                }
+            }, 5000);
+        }
+
+        // Prevent multiple form submissions
+        document.addEventListener('submit', function(e) {
+            const form = e.target;
+            const submitButton = form.querySelector('button[type="submit"]');
+
+            if (submitButton && !submitButton.disabled) {
+                // Disable button to prevent double submission
+                setTimeout(() => {
+                    submitButton.disabled = true;
+                }, 10);
+            }
+        });
     </script>
 </body>
 </html>
