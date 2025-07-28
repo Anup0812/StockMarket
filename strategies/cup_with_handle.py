@@ -107,7 +107,8 @@ class CupWithHandleStrategy(BaseStrategy):
         signal_details['cup_depth'] = active_pattern['cup_depth']
         signal_details['handle_depth'] = active_pattern.get('handle_depth', 0)
         signal_details['pattern_type'] = active_pattern['cup_type']
-        signal_details['potential_gain'] = potential_gain
+        signal_details['potential_gain'] = round(potential_gain * 100, 2)  # now in percentage format like 15.73
+
 
         return {
             'strategy_name': 'Cup with Handle',
