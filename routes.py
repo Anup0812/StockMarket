@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import json
+import logging
 from flask import render_template, request, redirect, url_for, flash, jsonify
 from app import app
 from data_manager import DataManager
@@ -14,6 +15,9 @@ from strategies.v10_strategy import V10Strategy
 from strategies.lifetime_high_strategy import LifetimeHighStrategy
 from strategies.week_low_strategy import WeekLowStrategy
 
+# Configure logging
+logging.basicConfig(level=logging.ERROR)
+logger = logging.getLogger(__name__)
 
 # Initialize managers
 data_manager = DataManager()
@@ -47,13 +51,13 @@ def getSignalBadgeClass(signal):
 
 def determine_overall_signal(signals):
     """Determine overall signal from a list of strategy signals.
-    Priority: Buy/Sell/Watch signals take precedence over Neutral,
-    then highest count, with Buy > Sell > Watch as tie-breakers."""
-
+    Choose signal with highest count (excluding 'Neutral' unless all are Neutral).
+    If there's a tie, resolve by priority: Buy > Sell > Watch.
+    """
     if not signals:
         return 'Neutral'
 
-    # Count each signal type
+    # Count signals
     counts = {
         'Buy': signals.count('Buy'),
         'Sell': signals.count('Sell'),
@@ -61,32 +65,28 @@ def determine_overall_signal(signals):
         'Neutral': signals.count('Neutral')
     }
 
-    # First, eliminate Neutral if there are any non-Neutral signals
-    non_neutral_counts = {k: v for k, v in counts.items() if k != 'Neutral'}
-    if sum(non_neutral_counts.values()) > 0:
-        # We have at least one Buy/Sell/Watch signal - ignore Neutral counts
-        max_count = max(non_neutral_counts.values())
-        candidates = [signal for signal, count in non_neutral_counts.items()
-                      if count == max_count]
-
-        # Resolve ties with priority: Buy > Sell > Watch
-        if 'Buy' in candidates:
-            return 'Buy'
-        elif 'Sell' in candidates:
-            return 'Sell'
-        else:
-            return 'Watch'
-    else:
-        # Only Neutral signals were found
+    # If all are Neutral
+    if counts['Neutral'] == len(signals):
         return 'Neutral'
+
+    # Consider only non-neutral signals
+    non_neutral_counts = {k: v for k, v in counts.items() if k != 'Neutral'}
+    max_count = max(non_neutral_counts.values())
+
+    # Get candidates with max count
+    candidates = [signal for signal, count in non_neutral_counts.items() if count == max_count]
+
+    # Resolve tie by priority
+    priority = ['Buy', 'Sell', 'Watch']
+    for signal in priority:
+        if signal in candidates:
+            return signal
 
 
 @app.route('/')
 def index():
     """Main dashboard - redirect to user view"""
-    #return redirect(url_for('user_dashboard'))
     return render_template('vivek_singhal_notes.html')
-
 
 
 @app.route('/admin/')
@@ -134,6 +134,7 @@ def add_stock():
             flash(f'Failed to add stock {stock_code} to {group}. It may already exist.', 'warning')
 
     except Exception as e:
+        logger.error(f"Error adding stock: {str(e)}")
         flash(f'Error adding stock: {str(e)}', 'error')
 
     return redirect(url_for('admin'))
@@ -154,6 +155,7 @@ def delete_stock():
             flash(f'Failed to delete stock {stock_code} from {group}', 'error')
 
     except Exception as e:
+        logger.error(f"Error deleting stock: {str(e)}")
         flash(f'Error deleting stock: {str(e)}', 'error')
 
     return redirect(url_for('admin'))
@@ -180,13 +182,9 @@ def bulk_upload():
     try:
         # Read the Excel file
         df = pd.read_excel(file)
-        print(f"Excel file read successfully. Shape: {df.shape}")
-        print(f"Columns: {df.columns.tolist()}")
-        print(f"First few rows:\n{df.head()}")
 
         # Get stock codes from first column, handle different data types
         raw_stock_codes = df.iloc[:, 0].tolist()
-        print(f"Raw stock codes: {raw_stock_codes[:10]}")  # Show first 10
 
         # Clean and filter stock codes
         stock_codes = []
@@ -213,10 +211,6 @@ def bulk_upload():
             else:
                 skipped_codes.append(f"Row {i + 1}: {code}")
 
-        print(f"Cleaned stock codes: {stock_codes}")
-        print(f"Skipped codes: {skipped_codes}")
-        print(f"Total valid stock codes found: {len(stock_codes)}")
-
         if not stock_codes:
             flash('No valid stock codes found in the Excel file. Please check the format.', 'error')
             if skipped_codes[:5]:  # Show first 5 skipped codes
@@ -229,20 +223,16 @@ def bulk_upload():
 
         for stock_code in stock_codes:
             try:
-                print(f"Attempting to add stock: {stock_code} to group: {group}")
                 result = data_manager.add_stock_to_group(stock_code, group)
                 if result:
                     success_count += 1
-                    print(f"Successfully added: {stock_code}")
                 else:
                     duplicate_stocks.append(stock_code)
-                    print(f"Duplicate stock: {stock_code}")
             except Exception as e:
                 failed_stocks.append(stock_code)
-                print(f"Exception adding {stock_code}: {e}")
+                logger.error(f"Exception adding {stock_code}: {e}")
 
         # Provide detailed feedback
-        messages = []
         if success_count > 0:
             flash(f'Successfully added {success_count} new stocks to {group}', 'success')
 
@@ -267,7 +257,7 @@ def bulk_upload():
     except pd.errors.ParserError:
         flash('Error reading the Excel file. Please check the file format.', 'error')
     except Exception as e:
-        print(f"Error processing file: {str(e)}")
+        logger.error(f"Error processing file: {str(e)}")
         flash(f'Error processing file: {str(e)}', 'error')
 
     return redirect(url_for('admin'))
@@ -301,14 +291,14 @@ def user_dashboard():
                             strategy_signal = future.result(timeout=5)  # 5 second timeout
                             strategy_signals[strategy_name] = strategy_signal or 'Neutral'
                         except FuturesTimeout:
-                            print(f"Timeout getting signal for {strategy_name} on {stock_code}")
+                            logger.warning(f"Timeout getting signal for {strategy_name} on {stock_code}")
                             strategy_signals[strategy_name] = 'Neutral'
                         except Exception as e:
-                            print(f"Error getting signal for {strategy_name} on {stock_code}: {e}")
+                            logger.error(f"Error getting signal for {strategy_name} on {stock_code}: {e}")
                             strategy_signals[strategy_name] = 'Neutral'
 
                 except Exception as e:
-                    print(f"Error getting signal for {strategy_name} on {stock_code}: {e}")
+                    logger.error(f"Error getting signal for {strategy_name} on {stock_code}: {e}")
                     strategy_signals[strategy_name] = 'Neutral'
 
             stock['strategy_signals'] = strategy_signals
@@ -381,7 +371,7 @@ def stock_detail(stock_code):
             if analysis:
                 strategy_analysis[strategy_name] = analysis
         except Exception as e:
-            print(f"Error analyzing {strategy_name} for {stock_code}: {e}")
+            logger.error(f"Error analyzing {strategy_name} for {stock_code}: {e}")
 
     return render_template('stock_detail.html',
                            stock_code=stock_code,
@@ -393,45 +383,108 @@ def stock_detail(stock_code):
 
 @app.route('/refresh_data', methods=['POST'])
 def refresh_data():
-    """Refresh all stock data from Yahoo Finance"""
+    """Refresh all stock data from Yahoo Finance with enhanced progress tracking"""
+    import time
+
     try:
+        start_time = time.time()
         all_stocks = data_manager.get_all_stock_codes()
         success_count = 0
         error_count = 0
+        skipped_count = 0
 
         if not all_stocks:
             flash('No stocks found to refresh', 'warning')
             return redirect(request.referrer or url_for('user_dashboard'))
 
-        for stock_code in all_stocks:
+        logger.info(f"Starting refresh for {len(all_stocks)} stocks")
+
+        # Track progress for each stock
+        total_stocks = len(all_stocks)
+
+        for i, stock_code in enumerate(all_stocks, 1):
             try:
+                # Log progress every 10 stocks
+                if i % 10 == 0 or i == total_stocks:
+                    logger.info(f"Processing stock {i}/{total_stocks}: {stock_code}")
+
+                stock_updated = False
+
                 # Fetch data for both 1y and 2y periods
                 for period in ['1y', '2y']:
-                    stock_data = yahoo_client.get_stock_data(stock_code, period)
-                    if not stock_data.empty:
-                        data_manager.save_stock_data(stock_code, stock_data, period)
-                        success_count += 1
+                    try:
+                        stock_data = yahoo_client.get_stock_data(stock_code, period)
+                        if not stock_data.empty:
+                            data_manager.save_stock_data(stock_code, stock_data, period)
+                            stock_updated = True
+                        else:
+                            logger.warning(f"No data returned for {stock_code} - {period}")
+                    except Exception as period_error:
+                        logger.error(f"Error fetching {period} data for {stock_code}: {period_error}")
+                        continue
 
                 # Fetch fundamental data
-                fundamental_data = yahoo_client.get_fundamental_data(stock_code)
-                if fundamental_data:
-                    data_manager.save_fundamental_data(stock_code, fundamental_data)
+                try:
+                    fundamental_data = yahoo_client.get_fundamental_data(stock_code)
+                    if fundamental_data:
+                        data_manager.save_fundamental_data(stock_code, fundamental_data)
+                        stock_updated = True
+                except Exception as fund_error:
+                    logger.warning(f"Error fetching fundamental data for {stock_code}: {fund_error}")
+
+                if stock_updated:
+                    success_count += 1
+                else:
+                    skipped_count += 1
+                    logger.warning(f"No data updated for {stock_code}")
 
             except Exception as e:
-                print(f"Error refreshing {stock_code}: {e}")
+                logger.error(f"Error refreshing {stock_code}: {e}")
                 error_count += 1
                 continue
 
+        end_time = time.time()
+        duration = round(end_time - start_time, 2)
+
+        # Prepare success message
+        messages = []
         if success_count > 0:
-            flash(f'Successfully refreshed data for {success_count // 2} stocks', 'success')
+            messages.append(f'Successfully refreshed {success_count} stocks')
+
+        if skipped_count > 0:
+            messages.append(f'{skipped_count} stocks had no new data')
+
         if error_count > 0:
-            flash(f'Failed to refresh data for {error_count} stocks', 'warning')
+            messages.append(f'{error_count} stocks failed to refresh')
+
+        # Create comprehensive flash message
+        if success_count > 0:
+            main_message = f'Data refresh completed in {duration}s. {" | ".join(messages)}'
+            flash(main_message, 'success')
+        elif error_count == total_stocks:
+            flash(f'Refresh failed for all {total_stocks} stocks. Please check your internet connection.', 'error')
+        else:
+            flash(f'Partial refresh completed in {duration}s. {" | ".join(messages)}', 'warning')
+
+        logger.info(
+            f"Refresh completed: {success_count} success, {error_count} errors, {skipped_count} skipped in {duration}s")
 
     except Exception as e:
-        print(f"Refresh error: {e}")
-        flash(f'Error refreshing data: {str(e)}', 'error')
+        logger.error(f"Critical refresh error: {e}")
+        flash(f'Critical error during refresh: {str(e)}', 'error')
 
     return redirect(request.referrer or url_for('user_dashboard'))
+
+
+@app.route('/api/refresh_status')
+def refresh_status():
+    """API endpoint to check refresh status (for future async implementation)"""
+    # This could be enhanced later to track refresh progress in real-time
+    # For now, just return a simple status
+    return jsonify({
+        'status': 'ready',
+        'message': 'Refresh functionality is available'
+    })
 
 
 @app.route('/api/chart_data/<stock_code>')
@@ -453,7 +506,7 @@ def get_chart_data(stock_code):
         try:
             chart_config = strategy.get_chart_config(stock_data)
         except Exception as e:
-            print(f"Error getting chart config for {strategy_name}: {e}")
+            logger.error(f"Error getting chart config for {strategy_name}: {e}")
 
     # Prepare data for Plotly
     chart_data = {
