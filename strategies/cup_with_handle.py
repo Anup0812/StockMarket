@@ -9,8 +9,7 @@ class CupWithHandleStrategy(BaseStrategy):
     def __init__(self):
         super().__init__()
         self.applicable_groups = ['V40', 'V40_Next']
-        self.min_gain_threshold = 0.40  # 40% minimum potential gain for lifetime high patterns
-        self.buy_gain_threshold = 0.15  # 15% minimum gain to trigger buy signal
+        self.min_gain_threshold = 0.15  # 15% minimum potential gain threshold for buy signal
 
     def get_signal(self, stock_data):
         """Get trading signal based on Cup with Handle pattern"""
@@ -25,13 +24,17 @@ class CupWithHandleStrategy(BaseStrategy):
         current_price = stock_data['Close'].iloc[-1]
 
         for pattern in patterns:
-            # Check potential gain from current price to target
-            potential_gain = (pattern['target_price'] - current_price) / current_price
+            # Check if we're at the handle breakout point AND have sufficient potential gain
+            if self._is_breakout_confirmed(stock_data, pattern):
+                # Calculate potential gain from current price to target
+                potential_gain = (pattern['target_price'] - current_price) / current_price
 
-            # Check if we're at the handle breakout point AND gain is >= 15%
-            if (self._is_breakout_confirmed(stock_data, pattern) and
-                    potential_gain >= self.buy_gain_threshold):
-                return 'Buy'
+                # Only buy if potential gain is 15% or more
+                if potential_gain >= self.min_gain_threshold:
+                    return 'Buy'
+                else:
+                    # If breakout confirmed but gain insufficient, watch for better entry
+                    return 'Watch'
 
             # Check if we're near the target (sell at technical target only)
             if current_price >= pattern['target_price'] * 0.95:
@@ -41,12 +44,13 @@ class CupWithHandleStrategy(BaseStrategy):
             if self._has_negative_potential_gain(stock_data, pattern):
                 return 'Sell'
 
-            # If pattern is forming but not confirmed, check if gain potential meets threshold
+            # If pattern is forming but not confirmed, check potential gain
             if self._is_pattern_forming(stock_data, pattern):
-                if potential_gain >= self.buy_gain_threshold:
-                    return 'Watch'  # Pattern forming with good gain potential
+                potential_gain = (pattern['target_price'] - current_price) / current_price
+                if potential_gain >= self.min_gain_threshold:
+                    return 'Watch'
                 else:
-                    return 'Neutral'  # Pattern forming but insufficient gain potential
+                    return 'Neutral'  # Not enough potential gain to be interesting
 
         return 'Neutral'
 
@@ -88,15 +92,17 @@ class CupWithHandleStrategy(BaseStrategy):
             else:
                 signal_details['reason'] = "Negative potential gain detected - stop loss triggered"
         elif signal == 'Watch':
-            signal_details['reason'] = f"Pattern forming with {potential_gain:.1%} potential gain (≥15% threshold met)"
-        elif signal == 'Neutral':
-            if potential_gain < self.buy_gain_threshold:
+            if self._is_breakout_confirmed(stock_data, active_pattern):
                 signal_details[
-                    'reason'] = f"Pattern identified but potential gain ({potential_gain:.1%}) below 15% threshold"
+                    'reason'] = f"Breakout confirmed but only {potential_gain:.1%} potential gain (<15% threshold)"
+            else:
+                signal_details['reason'] = f"Cup with Handle pattern forming with {potential_gain:.1%} potential gain"
+        else:
+            if potential_gain < self.min_gain_threshold:
+                signal_details[
+                    'reason'] = f"Pattern present but insufficient potential gain ({potential_gain:.1%} < 15%)"
             else:
                 signal_details['reason'] = "No valid Cup with Handle pattern identified"
-        else:
-            signal_details['reason'] = "No valid Cup with Handle pattern identified"
 
         signal_details['cup_depth'] = active_pattern['cup_depth']
         signal_details['handle_depth'] = active_pattern.get('handle_depth', 0)
@@ -483,10 +489,10 @@ class CupWithHandleStrategy(BaseStrategy):
             "3. Handle must be smaller than cup depth (max 50%)",
             "4. Neckline connects cup highs (max 1% variance)",
             "5. Handle forms a base (consolidation < 5% range)",
-            "6. Calculate potential gain: (Target - Current Price) / Current Price",
-            "7. Only proceed if potential gain ≥ 15%",
-            "8. Wait for breakout above base with green closing candle",
-            "9. Buy next day (or at closing) after breakout confirmation",
+            "6. Wait for breakout above base with green closing candle",
+            "7. Calculate potential gain: (Target - Current Price) / Current Price",
+            "8. Only buy if potential gain ≥ 15%",
+            "9. Buy next day (or at closing) after breakout confirmation with sufficient gain",
             "10. Calculate target: Neckline + Cup depth",
             "11. Sell at technical target",
         ]
